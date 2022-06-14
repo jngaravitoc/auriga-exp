@@ -1,8 +1,13 @@
 import numpy as np
 from numpy import Inf
+import sys
+
 ##  exp
+sys.path.append("/u/ngaravito/codes/exp/build/utils/Analysis/")
 from spherical_basis_builder import *
 import simpleSL
+
+## Auriga
 import LibAu as la
  
 
