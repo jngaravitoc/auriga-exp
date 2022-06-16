@@ -44,20 +44,28 @@ if __name__ == "__main__":
     # 1. Get positions from simulation 
     pos = DatDM['pos'] #part_rot[not_in_subs]
     mass = DatDM['mass']  #part['dark']['mass'][not_in_subs]
-    M_tot = np.sum(mass)
+    #M_tot = np.sum(mass)
 
     #selecting 1million random particles
-    ind = np.arange(0,len(mass),1,dtype=int)
-    sel = np.random.choice(ind, 10, replace=False).astype(int)
-    pos,mass = pos[sel],mass[sel]
+    #ind = np.arange(0,len(mass),1,dtype=int)
+    nparticles = 100000
+    #sel = np.random.choice(ind, nparticles, replace=False).astype(int)
+    #pos, mass = pos[sel],mass[sel]
     
+    #print(np.shape(pos))
     # 2. Make a density profiles from the simulation data
     # TODO check this is the right way to compute the density profile!
-    rr = np.sqrt(pos[:,0]**2 + pos[:,1]**2 + pos[:,2]**2)
-    rbins,dreturn = return_density(np.log10(rr), 1., rangevals=[0., 2.5],bins=100)
+    #rr = np.sqrt(pos[:,0]**2 + pos[:,1]**2 + pos[:,2]**2)
+    #rbins, dreturn = return_density(np.log10(rr), 1., rangevals=[0., 2.5],bins=100)
+
+    #plt.figure()
+    #plt.plot(rbins, dreturn)
+    #plt.yscale('log')
+    #plt.savefig("halo_density.png", bbox_inches='tight')
+    #plt.close()
 
     # 3. Build empirical basic
-    R,D,M,P = makemodel_empirical(rbins, dreturn, pfile='m12b_SPHLbasis_empirical.txt')
+    #R,D,M,P = makemodel_empirical(rbins, dreturn, pfile='m12b_SPHLbasis_empirical.txt')
     # TODO: what are 2, 6 args
     ebf = simpleSL.slfunctions('./m12b_SPHLbasis_empirical.txt',2,6,0.,2.5, 2000)
 
@@ -73,9 +81,9 @@ if __name__ == "__main__":
     print(ebf)
     xvals = 10.**(np.linspace(0,2.5, 2000))
 
-    #for n in range(0,5):
-    #    plt.plot(xvals, ebf[0][n], color='black')
-    #plt.savefig('./testfig.png')
-    #plt.close()
+    for n in range(0,5):
+        plt.plot(xvals, ebf[0][n], color='black')
+    plt.savefig('./testfig.png')
+    plt.close()
 
 
