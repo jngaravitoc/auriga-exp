@@ -150,23 +150,29 @@ if __name__ == "__main__":
 
     print(np.shape(coefficients))
     
-    r = np.linspace(0,200,50)
-    theta = np.linspace(0,2*np.pi,50)
-    rgrid, thetagrid = np.meshgrid(r, theta)
-    phigrid = np.zeros_like(rgrid)
+    #r = np.linspace(0,200,50)
+    #theta = np.linspace(0,2*np.pi,50)
+    #rgrid, thetagrid = np.meshgrid(r, theta)
+    #phigrid = np.zeros_like(rgrid)
+    x = np.linspace(-200, 200)
+    y = x
+    xgrid, ygrid = np.meshgrid(x, y)
 
-    den_mon = np.zeros_like(rgrid)
-    den_nonmon = np.zeros_like(rgrid)
+
+    den_mon = np.zeros_like(xgrid)
+    den_nonmon = np.zeros_like(xgrid)
 
     for i in range(50):
         for j in range(50):
-            den_mon[i][j], den_nonmon[i][j] = compute_density([rgrid[i][j], thetagrid[i][j], 0], coefficients)
+            r = (xgrid[i][j]**2 + ygrid[i][j]**2)**0.5
+            phi = np.arctan2(ygrid[i][j], xgrid[i][j])
+            den_mon[i][j], den_nonmon[i][j] = compute_density([r, 0, phi], coefficients)
 
-    Xgrid = rgrid * np.cos(thetagrid)
-    Ygrid = rgrid * np.sin(thetagrid)
+    #Xgrid = rgrid * np.cos(thetagrid)
+    #Ygrid = rgrid * np.sin(thetagrid)
     
     fig, ax = plt.subplots(1, 1)
-    ax.imshow(np.log10(np.abs(den_mon + den_nonmon)), extent=[-400, 400, -400, 400])
+    ax.contourf(xgrid, ygrid, np.log10(np.abs(den_mon + den_nonmon)))
     fig.savefig("2d_density.png", bbox_inches='tight')
     plt.close()
     
