@@ -267,7 +267,7 @@ def StellarDensity2D(x,y,weights,minMax=None,statistic='sum',npix = [250,250],st
     box=np.abs(_x[1]-_x[0])#k['box']
     #minMax = [0, 1]
 
-    if style=='normal': return grid,box
+    if style=='normal': return grid,_x,_y,box
     if statistic=='sum':
 
         if style=='SB':

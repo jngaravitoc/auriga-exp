@@ -2,10 +2,14 @@ import numpy as np
 from numpy import Inf
 import sys
 
+#from ctypes import *
+#simpleSL=cdll.LoadLibrary('/u/svarel/exp/build/utils/Analysis/simpleSL.cpython-36m-x86_64-linux-gnu.so')
+
 ##  exp
-sys.path.append("/u/ngaravito/codes/exp/build/utils/Analysis/")
+sys.path.append("/u/svarel/exp/build/utils/Analysis/")
 from spherical_basis_builder import *
 import simpleSL
+
 
 ## Auriga
 import LibAu as la
@@ -47,7 +51,7 @@ if __name__ == "__main__":
 
     #selecting 1million random particles
     ind = np.arange(0,len(mass),1,dtype=int)
-    sel = np.random.choice(ind, 10, replace=False).astype(int)
+    sel = np.random.choice(ind, 1000000, replace=False).astype(int)
     pos,mass = pos[sel],mass[sel]
 
     rr = np.sqrt(pos[:,0]**2 + pos[:,1]**2 + pos[:,2]**2)
@@ -63,10 +67,10 @@ if __name__ == "__main__":
     xvals = 10.**(np.linspace(0,2.5, 2000))
 
     for n in range(0,5):
-        plt.plot(xvals, E1[0][n],color='black')
+        plt.plot(xvals, ebf[0][n])
 
-        plt.savefig('./testfig.png')
-        plt.close()
+    plt.savefig('testfig.png')
+    plt.close()
 
     print(np.shape(coefficients))
 
