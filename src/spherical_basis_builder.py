@@ -39,9 +39,9 @@ import subprocess
 #from astropy.io import fits
 
 
-G= 6.674*1e-11 #m3⋅kg−1⋅s−2
-m2kpc, kg2Msun = 3.2408*1e-20,5e-31
-G=G*(m2kpc**3) /kg2Msun # kpc3 Msun-1 s-2
+#G= 6.674*1e-11 #m3⋅kg−1⋅s−2
+#m2kpc, kg2Msun = 3.2408*1e-20,5e-31
+#G=G*(m2kpc**3) /kg2Msun # kpc3 Msun-1 s-2
 
 def return_density(logr,weights=1.,rangevals=[-2, 6],bins=500,d2=False):
     """return_density
@@ -118,9 +118,7 @@ def makemodel(func,M,funcargs,rvals = 10.**np.linspace(-2.,4.,2000),pfile='',pla
     P           : (array of floats) the potential
     
     """
-    G= 6.674*1e-11 #m3⋅kg−1⋅s−2
-    m2kpc, kg2Msun = 3.2408*1e-20,5e-31
-    G=G*(m2kpc**3) /kg2Msun # kpc3 Msun-1 s-2
+
 
     R = np.nanmax(rvals)
     
@@ -178,7 +176,7 @@ def makemodel(func,M,funcargs,rvals = 10.**np.linspace(-2.,4.,2000),pfile='',pla
     return rvals*rfac,dfac*dvals,mfac*mvals,pfac*pvals
 
 
-def makemodel_empirical(rvals,dvals,pfile='',plabel = '',verbose=True):
+def makemodel_empirical(rvals,dvals,pfile='',plabel = '',verbose=True,M=1.):
     """make an EXP-compatible spherical basis function table
     
     inputs
@@ -195,7 +193,7 @@ def makemodel_empirical(rvals,dvals,pfile='',plabel = '',verbose=True):
     P           : (array of floats) the potential
     
     """
-    M = 1.
+    #M = 1.
     R = np.nanmax(rvals)
     
     # query out the density values
@@ -214,7 +212,7 @@ def makemodel_empirical(rvals,dvals,pfile='',plabel = '',verbose=True):
     # evaluate mass enclosed and potential energy by recursion
     for indx in range(1,dvals.size):
         mvals[indx] = mvals[indx-1] +          2.0*np.pi*(rvals[indx-1]*rvals[indx-1]*dvals[indx-1] +                 rvals[indx]*rvals[indx]*dvals[indx])*(rvals[indx] - rvals[indx-1]);
-        pwvals[indx] = pwvals[indx-1] +           2.0*np.pi*G*(rvals[indx-1]*dvals[indx-1] + rvals[indx]*dvals[indx])*(rvals[indx] - rvals[indx-1]);
+        pwvals[indx] = pwvals[indx-1] +           2.0*np.pi*(rvals[indx-1]*dvals[indx-1] + rvals[indx]*dvals[indx])*(rvals[indx] - rvals[indx-1]);
     
     # evaluate potential (see theory document)
     pvals = -mvals/(rvals+1.e-10) - (pwvals[dvals.size-1] - pwvals)
@@ -227,7 +225,7 @@ def makemodel_empirical(rvals,dvals,pfile='',plabel = '',verbose=True):
     Beta = (M/M0) * (R0/R);
     Gamma = np.sqrt((M0*R0)/(M*R)) * (R0/R);
     if verbose:
-        print("! Scaling:  R=",R,"  M=",M)
+        print("! Scaling:  R=",R,"  M=",M,"  M0=",M0,"  R0=",R0)
 
     rfac = np.power(Beta,-0.25) * np.power(Gamma,-0.5);
     dfac = np.power(Beta,1.5) * Gamma;
