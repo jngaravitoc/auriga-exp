@@ -24,8 +24,9 @@ class Reader_Au:
 
         self.Nhalo=Nhalo
         self.Nsnap=Nsnap
-        self.base = '/virgo/simulations/Auriga/level3_MHD/halo_%s/output/'%self.Nhalo
+        self.base = '/virgotng/mpa/Auriga/level3/Original/halo_%s/output/'%self.Nhalo
         self.sf = load_subfind(self.Nsnap, dir=self.base, loadonly=None)
+        #  /virgo/simulations/Auriga/level3_MHD
 
 
     def Header(self):
@@ -69,7 +70,7 @@ class Reader_Au:
 
         ## Only selected part
         ipart = (self.s.data['type'] == tpart)
-        fielddist=['age']
+        fielddist=['age','gsph']
         self.HaloPart = {}
         for l in fields:
             if l not in fielddist: self.HaloPart[l]=self.s.data[l][ipart]
@@ -161,13 +162,13 @@ class ToolRot:
             aedad={n:DatStar[n][edad_ind] for n in ['pos','vel']}
             apos,avel = aedad['pos'],aedad['vel']
             rstar_2d = np.sqrt(apos[:,0]**2 + apos[:,1]**2)
-
+            #print('rstar_2d',len(rstar_2d))
             #Seleccionando en posicion y edad
             cutpos = (rstar_2d<=rmax)&(rstar_2d>=rmin)#&(abs(aedad[2])<=zlim)
             apos,avel = apos[cutpos],avel[cutpos]
 
             atemp = np.hstack([apos,avel])
-
+            #print('atemp ',len(atemp[:,1]))
             #r X v
             Li = atemp[:,1]*atemp[:,5] - atemp[:,2]*atemp[:,4]
             Lj = atemp[:,2]*atemp[:,3] - atemp[:,0]*atemp[:,5]
@@ -280,8 +281,190 @@ def StellarDensity2D(x,y,weights,minMax=None,statistic='sum',npix = [250,250],st
         print('statistic i not sum')
         raise SystemExit
 
+def StellarDensity1D(R,f,boxl=0.5,lmin=0,lmax=50):
+    Flux = lambda m: 10.**(-0.4 * m)
+    kpc2arcsec = lambda x: (x*1000/10)*((180*60*60)/np.pi)
+    flux = Flux(f)
+
+    rstar = R#np.sqrt(fstar[:,0]**2 + fstar[:,1]**2)
+    #boxl,lmin,lmax = 0.5,0,50
+    r = np.arange(lmin,lmax,boxl)
+
+    box_arcsec = (boxl*1000/10)*((180*60*60)/np.pi)
+    #print(box_arcsec)
+    c = 0
+    sb = np.zeros( (r.size,2) )
+    # Perfil de brillo superficial
+    for i in range(r.size-1):
+        ind = (r[i]<=rstar)&(rstar<r[i+1])
+        sb[c,0] = r[i]
+        sb[c,1] = (np.sum(flux[ind]) ) / (np.pi*(r[i+1]**2 - r[i]**2) * kpc2arcsec(1)**2 ) #mag/arcsec^2
+        c+=1
+
+    mvs = -2.5*np.log10(sb[:,1])
+    return sb[:,0],mvs
 
 
+def Ropts(x,y,mag=26.5,):
+    #x,y are numpy array
+    ymag = np.abs(y-mag)
+    pos = np.argmin(ymag)
+
+    ropt = x[pos]
+    return ropt
+
+def MR5090(r,val,sel):
+    #based-code in LightRadii.py
+    # Calcula R90, R50
+    '''
+    r: array numpy radius proyected in the disc
+    val: list of values to calculate de Param
+    sel: float selecting stars by radius position
+    '''
+
+    sel = r<=sel
+
+    r = r[sel] #selecciona
+    sort = np.argsort(r) #ordena
+    r = r[sort]
+    R90,R50 = [],[]
+    M90,M50 = [],[]
+    ACC = []
+    for v in val:
+        v=v[sel][sort]
+
+        acc=  np.add.accumulate(v)/np.sum(v)
+        val05,val09 = np.argmin(np.abs(acc-0.5)),np.argmin(np.abs(acc-0.9))
+        r90,r50 = r[val09],r[val05]
+        m90,m50 = np.add.accumulate(v)[val09],np.add.accumulate(v)[val05]
+        R50.append(r50)
+        R90.append(r90)
+        M50.append(m50)
+        M90.append(m90)
+
+        ACC.append([r,acc])
+    if len(R90)==1: return R50[0],R90[0],M50[0],M90[0],ACC[0]
+    else: return np.array(R50),np.array(R90),np.array(M50),np.array(M90),np.array(ACC)
+
+
+class Asymmetry:
+    def __init__(self,
+                 stars_data,dm_data):
+        self.fstar = stars_data
+        self.fdm = dm_data
+        '''
+        fstar: [x,y,z,vx,vy,vz,m,age,idstar,Metal,U,B,V,K,g,r,i,z_]
+        fdm [x,y,z,vx,vy,vz,iddm]
+        '''
+
+    def Mfourier(self,Ropt,r_min=0.4,r_max=1.2,r_int=0.1):
+
+        #x,y,z,vx,vy,vz,m,age,idstar,insitu
+        #0,1,2,3 ,4 ,5 ,6, 7 ,8,9
+
+        ind = (np.abs(self.fstar[:,2])<=10) #seleccionando part con altura al disco <=10
+        sel = self.fstar[ind]
+
+        a = sel[:,:3] #Posiciones
+        am = sel[:,6] #Masas
+        #ais = sel[:,9]# insitu stars
+
+        del sel,ind
+
+        theta = np.arctan2(a[:,1],a[:,0]) #angulo/fase
+
+        r2d = np.sqrt(a[:,0]**2 + a[:,1]**2) #distancia polar
+        r2d = r2d/Ropt #Normalizacion por Ropt
+
+        ## Modos de Fourier
+        n_=round((r_max-r_min)/r_int)
+        rint = r_int#0.1
+        rmin = r_min#0.4
+        rmax = rmin+rint
+
+        B = [[],[],[],[],[],[],[]]
+        Rbin = []
+        for i in range(n_):
+
+            ind = (rmin<r2d)&(r2d<=rmax)
+            sel = a[ind]
+            selm = am[ind]
+            seltheta = theta[ind]
+            #sis = ais[ind]==1 #estrella formada insitu
+            for m in range(1,7):
+                an = np.sum( selm * np.cos(m*seltheta) )
+                bn = np.sum( selm * np.sin(m*seltheta) )
+                B[m].append(np.sqrt(an**2 + bn**2) )
+
+            B[0].append(np.sum(selm) )
+            Rbin.append(rmin)
+            rmax+=rint
+            rmin+=rint
+        B = np.array(B)
+        Rbin = np.array(Rbin)
+
+        An = B[1:]/B[0]
+
+        Amean= np.array([np.mean(Ai) for Ai in An] )
+        return Amean[0], (Rbin,An[0])
+
+
+    def CMstar(self,Ropt,rmin=0.4,rmax=1.2,zmax=10):
+        rmin,rmax=rmin*Ropt,rmax*Ropt
+        r = np.sqrt(self.fstar[:,0]**2 + self.fstar[:,1]**2 )
+        sel= (rmin<=r)&(r<=rmax) &(np.abs(self.fstar[:,2])<=zmax)
+        #sis = fstar[:,9]==1 # insitu stars
+
+        Mt = np.sum(self.fstar[:,6][sel])
+        cmx = np.sum(self.fstar[:,0][sel]*self.fstar[:,6][sel])/Mt
+        cmy = np.sum(self.fstar[:,1][sel]*self.fstar[:,6][sel])/Mt
+        cmz = np.sum(self.fstar[:,2][sel]*self.fstar[:,6][sel])/Mt
+        cm = np.sqrt(cmx**2 + cmy**2 )
+
+        '''Mtis = np.sum(self.fstar[:,6][sel & sis])
+        cmxis = np.sum(self.fstar[:,0][sel & sis]*fstar[:,6][sel & sis])/Mtis
+        cmyis = np.sum(self.fstar[:,1][sel & sis]*fstar[:,6][sel & sis])/Mtis
+        cmzis = np.sum(self.fstar[:,2][sel & sis]*fstar[:,6][sel & sis])/Mtis
+        cmis = np.sqrt(cmxis**2 + cmyis**2 )'''
+        return np.array([cmx,cmy,cmz])
+
+
+    def Deltar(self,Ropt,DMmass,**kwargs):
+        dmx,dmy,dmz = self.fdm[:,0],self.fdm[:,1],self.fdm[:,2]
+        dmr = np.sqrt(dmx**2 + dmy**2 + dmz**2)
+
+        cmxa,cmya,cmza = CM([dmx,dmy,dmz],DMmass)
+        CMa = np.sqrt(cmxa**2 + cmya**2 + cmza**2)
+
+        _1=(dmr<=3*Ropt)
+        cmx1,cmy1,cmz1 = CM([dmx[_1],dmy[_1],dmz[_1]],DMmass)
+        CM1 = np.sqrt(cmx1**2 + cmy1**2 + cmz1**2)
+
+        _5=(dmr<=5*Ropt)
+        cmx5,cmy5,cmz5 = CM([dmx[_5],dmy[_5],dmz[_5]],DMmass)
+        CM5 = np.sqrt(cmx5**2 + cmy5**2 + cmz5**2)
+
+        _50=(dmr<=50)
+        cmx50,cmy50,cmz50 = CM([dmx[_50],dmy[_50],dmz[_50]],DMmass)
+        CM50 = np.sqrt(cmx50**2 + cmy50**2 + cmz50**2)
+
+        _100=(dmr<=100)
+        cmx100,cmy100,cmz100 = CM([dmx[_100],dmy[_100],dmz[_100]],DMmass)
+        CM100 = np.sqrt(cmx100**2 + cmy100**2 + cmz100**2)
+        ret = [np.array([cmxa,cmya,cmza]),np.array([cmx1,cmy1,cmz1]),np.array([cmx5,cmy5,cmz5]),np.array([cmx50,cmy50,cmz50]),np.array([cmx100,cmy100,cmz100])]
+
+        if 'R200' in kwargs.keys():
+            r200 = kwargs['R200']
+            _50o=(50<=dmr)&(dmr<=r200)
+            cmx50o,cmy50o,cmz50o = CM([dmx[_50o],dmy[_50o],dmz[_50o]],DMmass)
+            CM50o = np.sqrt(cmx50o**2 + cmy50o**2 + cmz50o**2)
+            ret.append(np.array([cmx50o,cmy50o,cmz50o]))
+
+            _10o=(100<=dmr)&(dmr<=r200)
+            cmx10o,cmy10o,cmz10o = CM([dmx[_10o],dmy[_10o],dmz[_10o]],DMmass)
+            CM10o = np.sqrt(cmx10o**2 + cmy10o**2 + cmz10o**2)
+            ret.append(np.array([cmx10o,cmy10o,cmz10o]))
+        return ret
 
 
 
@@ -618,3 +801,68 @@ hdf5_part_field = {
 #omega_m=0.307
 #w = omega_m / (omega_lambda*(fac_esc**3))
 #hubble_t = h_0 * np.sqrt(omega_lambda * np.sqrt(1+w))
+
+# OTROS ______________________________________________________
+class colors:
+    CEND      = '\33[0m'
+    CBOLD     = '\33[1m'
+    CITALIC   = '\33[3m'
+    CURL      = '\33[4m'
+    CBLINK    = '\33[5m'
+    CBLINK2   = '\33[6m'
+    CSELECTED = '\33[7m'
+
+    CBLACK  = '\33[30m'
+    CRED    = '\33[31m'
+    CGREEN  = '\33[32m'
+    CYELLOW = '\33[33m'
+    CBLUE   = '\33[34m'
+    CVIOLET = '\33[35m'
+    CBEIGE  = '\33[36m'
+    CWHITE  = '\33[37m'
+
+    CBLACKBG  = '\33[40m'
+    CREDBG    = '\33[41m'
+    CGREENBG  = '\33[42m'
+    CYELLOWBG = '\33[43m'
+    CBLUEBG   = '\33[44m'
+    CVIOLETBG = '\33[45m'
+    CBEIGEBG  = '\33[46m'
+    CWHITEBG  = '\33[47m'
+
+    CGREY    = '\33[90m'
+    CRED2    = '\33[91m'
+    CGREEN2  = '\33[92m'
+    CYELLOW2 = '\33[93m'
+    CBLUE2   = '\33[94m'
+    CVIOLET2 = '\33[95m'
+    CBEIGE2  = '\33[96m'
+    CWHITE2  = '\33[97m'
+
+    CGREYBG    = '\33[100m'
+    CREDBG2    = '\33[101m'
+    CGREENBG2  = '\33[102m'
+    CYELLOWBG2 = '\33[103m'
+    CBLUEBG2   = '\33[104m'
+    CVIOLETBG2 = '\33[105m'
+    CBEIGEBG2  = '\33[106m'
+    CWHITEBG2  = '\33[107m'
+#>>> print(colors.WARNING + "Warning: No active frommets remain. Continue?" + colors.ENDC)
+#>>> print(f"{bcolors.WARNING}Warning: No active frommets remain. Continue?{bcolors.ENDC}")
+#def tcolor
+#    lib = {'header':colors.HEADER
+#        }
+    
+     
+def PrintPercent(i,T,typ='fraper',text=None):
+    if typ=='fraction': print('==> '+str(i)+'/'+str(T),end='\r')
+    if typ=='percent' : print('==> '+str(round(i*100/T,3))+'%' ,end='\r')
+    if typ=='fraper'  :
+        txt= '' if text==None else text
+        nbar = 20
+        f = round(nbar*(i/T))
+        txtbar = colors.CWHITEBG+' '+colors.CEND+f"{colors.CGREENBG}"+' '*f +f"{colors.CEND}"+f"{colors.CBLACKBG}"+' '*(nbar-f) +f"{colors.CEND}"+ colors.CWHITEBG+' '+colors.CEND
+        flecha=colors.CBOLD+colors.CRED+'-==> '+colors.CEND
+        percent=colors.CBOLD+colors.CWHITE+str(round(i*100/T,1))+'%'+colors.CEND
+        print(txtbar+' '+flecha + str(i)+'/'+str(T)+' - '+ percent+'-'+txt ,end='\r')   
+
