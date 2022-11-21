@@ -4,7 +4,8 @@ from scipy.stats import binned_statistic_2d, binned_statistic
 import matplotlib.pyplot as plt
 #from sklearn.neighbors import KernelDensity
 import h5py
-#from scipy import integrate
+from schwimmbad import SerialPool,MultiPool
+from scipy import integrate
 #from scipy.interpolate import interp1d,interp2d
 #from loadmodules import *
 from fortran import *
@@ -55,7 +56,41 @@ class Reader_Au:
         if fields==None: return self.sf.data
         else: return {n:self.sf.data[n] for n in fields}
 
-    def Snapshot_Subhalo(self,idSubhalo,snapType='stars',fields=None, allPart = False):
+    def AgesFunction(self,Uage = None, verbose = None):
+        F = lambda x,H0,Om,Ol: 1.0/np.sqrt(Om/x + Ol*x**2) /H0
+
+        #Cosmology
+        head = self.Header()
+        h = head['hubbleparam']
+        Ol = head['omegalambda']
+        Om = head['omega0']
+        z = head['redshift']
+        sfu = 1/(1+z)
+        Gyr_in_sec = 3.15569e16
+        kmsMpc_in_Hz = 3.24077929E-20
+        H0 = 100 * h * kmsMpc_in_Hz  #(seconds^-1)
+
+        #edad del Universo en Gyr
+        args = (H0,Om,Ol)
+        y = integrate.quad(F,0,sfu,args)
+        ageU = y[0]/Gyr_in_sec
+        if verbose=='yes':print(colors.CBOLD+colors.CRED+'.::AGE UNIVERSE: '+colors.CEND+str(round(ageU,3))+' Gyr')
+
+        #edades en Gyr usando scalefactor
+        sf = np.linspace(0,sfu,1000)
+        N=len(sf)
+        #sf_ = sf.copy()
+        Func = lambda sf_ : integrate.quad(F,0.0,sf_,args)[0]
+        lookback = np.array(list(map(Func,sf)))
+        lookback = lookback/Gyr_in_sec
+        lookback = ageU - lookback
+        p = np.polyfit(sf,lookback, 10)
+        Ages = np.poly1d(p)
+
+        if Uage!=None: return Ages,ageU
+        else:return Ages
+
+    def Snapshot_Subhalo(self,idSubhalo,snapType='stars',fields=None, allPart = False,CalcStellarAges='default'):
         '''Carga toda las particulas de un tipo de un subhalo
         especifico
         Especificaciones --> tpart
@@ -76,7 +111,12 @@ class Reader_Au:
             if l not in fielddist: self.HaloPart[l]=self.s.data[l][ipart]
             else: self.HaloPart[l]=self.s.data[l]
         if 'age' in fields:
-            self.HaloPart['age'] = self.s.cosmology_get_lookback_time_from_a(self.HaloPart['age'], is_flat=True)
+            if CalcStellarAges=='default': self.HaloPart['age'] = self.s.cosmology_get_lookback_time_from_a(self.HaloPart['age'], is_flat=True)
+            if CalcStellarAges=='CalcAgesAlt':
+                AgesFunc,AgeU = self.AgesFunction(Uage='yes')
+                self.HaloPart['age'] = AgesFunc(self.HaloPart['age'])
+                self.AgeU = AgeU
+
         if allPart: return self.HaloPart
 
         else:
@@ -142,7 +182,7 @@ class ToolRot:
                 self.Data[c]['vel']=(self.Ht*self.Data[c]['pos']) + self.sc*(self.Data[c]['vel']-self.cvel)
             return self.Data
 
-    def Rotate(self):
+    def Rotate(self,UseMulti=None):
         self.Data = self.Centered()
         self.Data = self.PhVel()
         k = self.Data.keys()
@@ -198,12 +238,17 @@ class ToolRot:
                 #print('case4')
 
             dat = np.hstack([DatStar['pos'],DatStar['vel']])
-            af = np.copy(self.rotor(dat))#np.copy(as3)
+
+
+            if UseMulti==None : af = np.copy(self.rotor(dat))#np.copy(as3)
+            if UseMulti=='SerialPool' : af = np.copy(self.rotor_serialpool(dat))
+
             if 'stars' in self.Data.keys():
                 for pt in self.Data.keys():
                     if pt=='stars':continue
                     datpt = Datapt[pt]
-                    afpt = np.copy(self.rotor(datpt))
+                    if UseMulti==None : afpt = np.copy(self.rotor(datpt))#np.copy(as3)
+                    if UseMulti=='SerialPool' : afpt = np.copy(self.rotor_serialpool(datpt))
                     Datapt[pt]=afpt
 
             if i==0:
@@ -252,8 +297,39 @@ class ToolRot:
 
         return as3
 
+    def rotoruni(self,dat):
+        as1 = np.copy(dat)
+        as1[0] =  dat[0]*np.cos(np.deg2rad(self.phi)) + dat[1]*np.sin(np.deg2rad(self.phi))
+        as1[1] = -dat[0]*np.sin(np.deg2rad(self.phi)) + dat[1]*np.cos(np.deg2rad(self.phi))
+        as1[2] =  dat[2]
+        as1[3] =  dat[3]*np.cos(np.deg2rad(self.phi)) + dat[4]*np.sin(np.deg2rad(self.phi))
+        as1[4] = -dat[3]*np.sin(np.deg2rad(self.phi)) + dat[4]*np.cos(np.deg2rad(self.phi))
+        as1[5] =  dat[5]
 
 
+        as2 = np.copy(as1)
+        as2[0] = as1[0]
+        as2[1] = as1[2]*np.sin(np.deg2rad(self.theta)) + as1[1]*np.cos(np.deg2rad(self.theta))
+        as2[2] = as1[2]*np.cos(np.deg2rad(self.theta)) - as1[1]*np.sin(np.deg2rad(self.theta))
+        as2[3] = as1[3]
+        as2[4] = as1[5]*np.sin(np.deg2rad(self.theta)) + as1[4]*np.cos(np.deg2rad(self.theta))
+        as2[5] = as1[5]*np.cos(np.deg2rad(self.theta)) - as1[4]*np.sin(np.deg2rad(self.theta))
+
+        #phi = -phi
+
+        as3 = np.copy(as2)
+        as3[0] =  as2[0]*np.cos(np.deg2rad(-self.phi)) + as2[1]*np.sin(np.deg2rad(-self.phi))
+        as3[1] = -as2[0]*np.sin(np.deg2rad(-self.phi)) + as2[1]*np.cos(np.deg2rad(-self.phi))
+        as3[2] =  as2[2]
+        as3[3] =  as2[3]*np.cos(np.deg2rad(-self.phi)) + as2[4]*np.sin(np.deg2rad(-self.phi))
+        as3[4] = -as2[3]*np.sin(np.deg2rad(-self.phi)) + as2[4]*np.cos(np.deg2rad(-self.phi))
+        as3[5] =  as2[5]
+
+        return as3
+    def rotor_serialpool(self,Data):
+        pool= SerialPool()
+        values = np.array(list(pool.map(self.rotoruni, Data)))
+        return values
 
 
 
