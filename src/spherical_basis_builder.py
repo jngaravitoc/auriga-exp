@@ -176,15 +176,17 @@ def makemodel(func,M,funcargs,rvals = 10.**np.linspace(-2.,4.,2000),pfile='',pla
     return rvals*rfac,dfac*dvals,mfac*mvals,pfac*pvals
 
 
-def makemodel_empirical(rvals,dvals,pfile='',plabel = '',verbose=True,M=1.):
+def makemodel_empirical(rvals,dvals,pfile='',plabel = '',verbose=True):
     """make an EXP-compatible spherical basis function table
     
     inputs
     -------------
-    rvals       : (array of floats) radius values to evaluate the density function
+    rvals       : (array of floats) sampled radius points
+    dvals       : (array of floats) density values at radius points
     pfile       : (string) the name of the output file. If '', will not print file
     plabel      : (string) comment string
     verbose     : (boolean)
+    
     outputs
     -------------
     R           : (array of floats) the radius values
@@ -193,7 +195,7 @@ def makemodel_empirical(rvals,dvals,pfile='',plabel = '',verbose=True,M=1.):
     P           : (array of floats) the potential
     
     """
-    #M = 1.
+    M = 1.
     R = np.nanmax(rvals)
     
     # query out the density values
@@ -211,8 +213,11 @@ def makemodel_empirical(rvals,dvals,pfile='',plabel = '',verbose=True,M=1.):
 
     # evaluate mass enclosed and potential energy by recursion
     for indx in range(1,dvals.size):
-        mvals[indx] = mvals[indx-1] +          2.0*np.pi*(rvals[indx-1]*rvals[indx-1]*dvals[indx-1] +                 rvals[indx]*rvals[indx]*dvals[indx])*(rvals[indx] - rvals[indx-1]);
-        pwvals[indx] = pwvals[indx-1] +           2.0*np.pi*(rvals[indx-1]*dvals[indx-1] + rvals[indx]*dvals[indx])*(rvals[indx] - rvals[indx-1]);
+        mvals[indx] = mvals[indx-1] +\
+          2.0*np.pi*(rvals[indx-1]*rvals[indx-1]*dvals[indx-1] +\
+                 rvals[indx]*rvals[indx]*dvals[indx])*(rvals[indx] - rvals[indx-1]);
+        pwvals[indx] = pwvals[indx-1] + \
+          2.0*np.pi*(rvals[indx-1]*dvals[indx-1] + rvals[indx]*dvals[indx])*(rvals[indx] - rvals[indx-1]);
     
     # evaluate potential (see theory document)
     pvals = -mvals/(rvals+1.e-10) - (pwvals[dvals.size-1] - pwvals)
@@ -225,7 +230,7 @@ def makemodel_empirical(rvals,dvals,pfile='',plabel = '',verbose=True,M=1.):
     Beta = (M/M0) * (R0/R);
     Gamma = np.sqrt((M0*R0)/(M*R)) * (R0/R);
     if verbose:
-        print("! Scaling:  R=",R,"  M=",M,"  M0=",M0,"  R0=",R0)
+        print("! Scaling:  R=",R,"  M=",M)
 
     rfac = np.power(Beta,-0.25) * np.power(Gamma,-0.5);
     dfac = np.power(Beta,1.5) * Gamma;
@@ -244,7 +249,10 @@ def makemodel_empirical(rvals,dvals,pfile='',plabel = '',verbose=True,M=1.):
         print(rvals.size,file=f)
 
         for indx in range(0,rvals.size):
-            print('{0} {1} {2} {3}'.format( rfac*rvals[indx],              dfac*dvals[indx],              mfac*mvals[indx],              pfac*pvals[indx]),file=f)
+            print('{0} {1} {2} {3}'.format( rfac*rvals[indx],\
+              dfac*dvals[indx],\
+              mfac*mvals[indx],\
+              pfac*pvals[indx]),file=f)
     
         f.close()
     
