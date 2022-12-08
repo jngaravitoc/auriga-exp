@@ -77,14 +77,14 @@ class Reader_Au:
         if verbose=='yes':print(colors.CBOLD+colors.CRED+'.::AGE UNIVERSE: '+colors.CEND+str(round(ageU,3))+' Gyr')
 
         #edades en Gyr usando scalefactor
-        sf = np.linspace(0,sfu,1000)
-        N=len(sf)
+        _sf = np.linspace(0,sfu,1000)
+        N=len(_sf)
         #sf_ = sf.copy()
         Func = lambda sf_ : integrate.quad(F,0.0,sf_,args)[0]
-        lookback = np.array(list(map(Func,sf)))
+        lookback = np.array(list(map(Func,_sf)))
         lookback = lookback/Gyr_in_sec
         lookback = ageU - lookback
-        p = np.polyfit(sf,lookback, 10)
+        p = np.polyfit(_sf,lookback, 10)
         Ages = np.poly1d(p)
 
         if Uage!=None: return Ages,ageU
