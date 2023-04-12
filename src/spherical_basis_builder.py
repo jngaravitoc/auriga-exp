@@ -143,7 +143,7 @@ def makemodel(func,M,funcargs,rvals = 10.**np.linspace(-2.,4.,2000),pfile='',pla
     pvals = -mvals/(rvals+1.e-10) - (pwvals[dvals.size-1] - pwvals)
 
     # get the maximum mass and maximum radius
-    M0 = mvals[dvals.size-1]
+    M0 = mvals[dvals.size-1] 
     R0 = rvals[dvals.size-1]
 
     # compute scaling factors
@@ -176,7 +176,7 @@ def makemodel(func,M,funcargs,rvals = 10.**np.linspace(-2.,4.,2000),pfile='',pla
     return rvals*rfac,dfac*dvals,mfac*mvals,pfac*pvals
 
 
-def makemodel_empirical(rvals,dvals,pfile='',plabel = '',verbose=True):
+def makemodel_empirical(rvals,dvals,pfile='',plabel = '',verbose=True, GetScaling=False):
     """make an EXP-compatible spherical basis function table
     
     inputs
@@ -255,7 +255,7 @@ def makemodel_empirical(rvals,dvals,pfile='',plabel = '',verbose=True):
               pfac*pvals[indx]),file=f)
     
         f.close()
-    
+    if GetScaling:return rvals*rfac,dfac*dvals,mfac*mvals,pfac*pvals,(rfac,dfac,mfac,pfac)
     return rvals*rfac,dfac*dvals,mfac*mvals,pfac*pvals
 
 def empirical_density_profile(pos, mass, nbins=500, rmin=0, rmax=600):
