@@ -101,8 +101,7 @@ for ii,ns in enumerate(Lsnap[::-1]):
     rrmin,rrmax=np.nanmin(np.log10(rr)),np.nanmax(np.log10(rr))
     r,rho = return_density(np.log10(rr),weights= DMmass, rangevals=[rrmin, rrmax],bins=binrad)
 
-    if  ns==63:
-        nametab = "Au{}_Snap{}_table.txt".format(nhalo,63)
+    nametab = "Au{}_Snap{}_table.txt".format(nhalo,ns)
         #rad,rho = empirical_density_profile(pos,mb, nbins=500, rmin=np.min(R), rmax=np.max(R))
         #R0,D0,M0,P0,scal = makemodel_empirical(r, rho, nametab,GetScaling=True)
         '''config_=config(len(R0),round(np.nanmin(R0),3), round(np.nanmax(R0),3),nametab)
@@ -122,14 +121,14 @@ for ii,ns in enumerate(Lsnap[::-1]):
         
         #---------------------
         #plt.plot(R0,np.log10(D0),color=colors[ii],zorder=ns)
-        plt.plot(r,rho,color=colors[ii],zorder=ns)
+        plt.plot(r,np.log10(rho),color=colors[ii],zorder=ns)
         
     if ns==63: continue
 
     
     #R,D,M,P = makemodel_empirical(r, rho, "Au{}_Snap{}_table.txt".format(nhalo,ns))
         
-    plt.plot(r,rho,color=colors[ii],zorder=ns)
+    plt.plot(r,np.log10(rho),color=colors[ii],zorder=ns)
     plt.text(r[-1],rho[-1],str(ns))
 plt.xscale('log')    
 plt.savefig('plots/check63vsT_basis/Au%s_rho-r.png'%nhalo)
